@@ -1,28 +1,32 @@
+import os
 import sys
-from pathlib import Path
-import pytz
 
-parent_dir = str(Path(__file__).parent.parent)
-sys.path.append(parent_dir)
-
+sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "..")))
+repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+sys.path.insert(0, repo_root)
 
 import zipfile
+from datetime import datetime
+from pathlib import Path
 
 import folium
 import geopandas as gpd
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
+import pydeck as pdk
 import requests
 import streamlit as st
-from branca.colormap import LinearColormap
 from streamlit_folium import st_folium
 
-from src.config import DATA_DIR
-from src.inference import fetch_next_hour_predictions, load_batch_of_features_from_store
-from src.plot_utils import plot_prediction
-
-# Add parent directory to Python path
-
+from config import DATA_DIR
+from inference import (
+    get_model_predictions,
+    load_batch_of_features_from_store,
+    load_metrics_from_registry,
+    load_model_from_registry,
+)
+from plot_utils import plot_aggregated_time_series
 
 # Initialize session state for the map
 if "map_created" not in st.session_state:
@@ -48,7 +52,7 @@ def visualize_predicted_demand(shapefile_path, predicted_demand):
     # Assuming the shapefile has a column 'zone_id' or 'LocationID' for taxi zones
     if "LocationID" not in gdf.columns:
         raise ValueError(
-            "Shapefile must contain a 'LocationID' column to match taxi zones."
+            "Shapefile must contain a 'LocationID' column to match bike zones."
         )
 
     # Add a new column for predicted rides, defaulting to 0 if no prediction is available
@@ -67,11 +71,23 @@ def visualize_predicted_demand(shapefile_path, predicted_demand):
     )
 
     # Add title and labels
-    ax.set_title("Predicted NYC Taxi Rides by Zone", fontsize=16)
+    ax.set_title("Predicted NYC Bike Rides by Zone", fontsize=16)
     ax.set_axis_off()  # Turn off axis for a cleaner map
 
     # Show the plot
     st.pyplot(fig)
+
+
+import os
+import tempfile
+
+import folium
+import geopandas as gpd
+import numpy as np
+import pandas as pd
+import streamlit as st
+from branca.colormap import LinearColormap
+from streamlit_folium import st_folium
 
 
 def create_taxi_map(shapefile_path, prediction_data):
@@ -216,21 +232,13 @@ def load_shape_data_file(
 
 # st.set_page_config(layout="wide")
 
-
-#current_date = pd.Timestamp.now(tz="Etc/UTC")
-#st.title(f"New York Yellow Taxi Cab Demand Next Hour")
-#st.header(f'{current_date.strftime("%Y-%m-%d %H:%M:%S")}')
-
-# Convert UTC to New York Time (EST/EDT)
-nyc_tz = pytz.timezone("America/New_York")
-current_date = pd.Timestamp.now(tz="UTC").tz_convert(nyc_tz)
-
+current_date = pd.Timestamp.now(tz="Etc/UTC")
 st.title(f"New York Yellow Taxi Cab Demand Next Hour")
-st.header(f'{current_date.strftime("%Y-%m-%d %H:%M:%S %Z")}')  # Added timezone
+st.header(f'{current_date.strftime("%Y-%m-%d %H:%M:%S")}')
 
 progress_bar = st.sidebar.header("Working Progress")
 progress_bar = st.sidebar.progress(0)
-N_STEPS = 4
+N_STEPS = 5
 
 
 with st.spinner(text="Download shape file for taxi zones"):
@@ -245,23 +253,30 @@ with st.spinner(text="Fetching batch of inference data"):
     progress_bar.progress(2 / N_STEPS)
 
 
-with st.spinner(text="Fetching predictions"):
-    predictions = fetch_next_hour_predictions()
+with st.spinner(text="Load model from registry"):
+    model = load_model_from_registry()
     st.sidebar.write("Model was loaded from the registry")
     progress_bar.progress(3 / N_STEPS)
+
+with st.spinner(text="Computing model predictions"):
+    predictions = get_model_predictions(model, features)
+    st.sidebar.write("Model predictions computed")
+    progress_bar.progress(4 / N_STEPS)
+    print(predictions)
+
 
 shapefile_path = DATA_DIR / "taxi_zones" / "taxi_zones.shp"
 
 with st.spinner(text="Plot predicted rides demand"):
-    # predictions_df = visualize_predicted_demand(
-    #     shapefile_path, predictions["predicted_demand"]
-    # )
-    st.subheader("Taxi Ride Predictions Map")
-    map_obj = create_taxi_map(shapefile_path, predictions)
+    predictions_df = visualize_predicted_demand(
+        shapefile_path, predictions["predicted_demand"]
+    )
+    # st.subheader("Taxi Ride Predictions Map")
+    # map_obj = create_taxi_map(shapefile_path, predictions)
 
     # Display the map
-    if st.session_state.map_created:
-        st_folium(st.session_state.map_obj, width=800, height=600, returned_objects=[])
+    # if st.session_state.map_created:
+    #     st_folium(st.session_state.map_obj, width=800, height=600, returned_objects=[])
 
     # Display data statistics
     st.subheader("Prediction Statistics")
@@ -284,59 +299,17 @@ with st.spinner(text="Plot predicted rides demand"):
 
     # Show sample of the data
     st.sidebar.write("Finished plotting taxi rides demand")
-    progress_bar.progress(4 / N_STEPS)
+    progress_bar.progress(5 / N_STEPS)
 
-# st.dataframe(predictions.sort_values("predicted_demand", ascending=False).head(10))
-# top10 = (
-#     predictions.sort_values("predicted_demand", ascending=False)
-#     .head(10)["pickup_location_id"]
-#     .to_list()
-# )
-# for location_id in top10:
-#     fig = plot_prediction(
-#         features=features[features["pickup_location_id"] == location_id],
-#         prediction=predictions[predictions["pickup_location_id"] == location_id],
-#     )
-#     st.plotly_chart(fig, theme="streamlit", use_container_width=True)
-    
-# Load lookup table
-lookup_table_path = DATA_DIR / "taxi_zone_lookup.csv"
-lookup_table = pd.read_csv(lookup_table_path, usecols=["LocationID", "Zone"])
-
-# Merge predictions with lookup table to get location name
-predictions = pd.merge(predictions, lookup_table, left_on="pickup_location_id", right_on="LocationID", how="left")
-predictions.drop(columns=["LocationID"], inplace=True)
-
-st.dataframe(predictions.sort_values("predicted_demand", ascending=False).head(10))
-
-top10 = (
-    predictions.sort_values("predicted_demand", ascending=False)
-    .head(10)["pickup_location_id"]
-    .to_list()
+st.dataframe(predictions.sort_values("predicted_demand", ascending=False).head(5))
+top5 = (
+    predictions.sort_values("predicted_demand", ascending=False).head(5).index.tolist()
 )
-
-for location_id in top10:
-    fig = plot_prediction(
-        features=features[features["pickup_location_id"] == location_id],
-        prediction=predictions[predictions["pickup_location_id"] == location_id],
+for location_id in top5:
+    fig = plot_aggregated_time_series(
+        features=features,
+        targets=predictions["predicted_demand"],
+        row_id=location_id,
+        predictions=pd.Series(predictions["predicted_demand"]),
     )
     st.plotly_chart(fig, theme="streamlit", use_container_width=True)
- 
-unique_zones = predictions["Zone"].unique().tolist()
-selected_zone = st.selectbox("Select Zone", ["All Zones"] + unique_zones)
-
-# Plot predictions for selected zone
-if selected_zone != "All Zones":
-    zone_predictions = predictions[predictions["Zone"] == selected_zone]
-    zone_location_ids = zone_predictions["pickup_location_id"].to_list()
-
-    for location_id in zone_location_ids:
-        fig = plot_prediction(
-            features=features[features["pickup_location_id"] == location_id],
-            prediction=predictions[predictions["pickup_location_id"] == location_id],
-        )
-        st.plotly_chart(fig, theme="streamlit", use_container_width=True)
-
-
-
-        
