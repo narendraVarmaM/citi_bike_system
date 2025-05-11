@@ -27,8 +27,8 @@ for directory in [
     directory.mkdir(parents=True, exist_ok=True)
 
 
-HOPSWORKS_API_KEY = os.getenv("HOPSWORKS_API_KEY")
-HOPSWORKS_PROJECT_NAME = os.getenv("HOPSWORKS_PROJECT_NAME")
+HOPSWORKS_API_KEY = "ty6DrE8murTDRXJ3.twpRUiqxCq5LOXsUhFeFlyfpJRFGuFd1FS4Rgnbq5WtWxwAhsnkrxjH64BBe86Y9"
+HOPSWORKS_PROJECT_NAME = "sp25_taxi_nmuppala"
 
 FEATURE_GROUP_NAME = "citibike_hourly_features"
 FEATURE_GROUP_VERSION = 1
