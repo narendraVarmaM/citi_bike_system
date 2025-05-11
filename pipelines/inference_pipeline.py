@@ -33,12 +33,12 @@ ts_data["pickup_hour"] = ts_data["pickup_hour"].dt.tz_localize(None)
 
 from src.data_utils import transform_ts_data_info_features
 
-features = transform_ts_data_info_features(ts_data, window_size=24 * 28, step_size=23)
+features = transform_ts_data_info_features(ts_data, window_size=6 * 28, step_size=1)
 
 model = load_model_from_registry()
 
 predictions = get_model_predictions(model, features)
-predictions["pickup_hour"] = current_date.ceil("h")
+predictions["pickup_hour"] = current_date.ceil("4h")
 print(predictions)
 
 feature_group = get_feature_store().get_or_create_feature_group(
