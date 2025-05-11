@@ -19,7 +19,7 @@ ts_data = fetch_days_data(180)
 print(f"Transforming to ts_data ...")
 
 features, targets = transform_ts_data_info_features_and_target(
-    ts_data, window_size=24 * 28, step_size=23
+    ts_data, window_size=6 * 28, step_size=1
 )
 pipeline = get_pipeline()
 print(f"Training model ...")
