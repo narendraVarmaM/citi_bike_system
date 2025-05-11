@@ -34,6 +34,7 @@ merged_df = pd.merge(df1, df2, on=["pickup_location_id", "pickup_hour"])
 # Calculate the absolute error
 merged_df["absolute_error"] = abs(merged_df["predicted_demand"] - merged_df["rides"])
 
+st.table(merged_df)
 # Group by 'pickup_hour' and calculate the mean absolute error (MAE)
 mae_by_hour = merged_df.groupby("pickup_hour")["absolute_error"].mean().reset_index()
 mae_by_hour.rename(columns={"absolute_error": "MAE"}, inplace=True)
