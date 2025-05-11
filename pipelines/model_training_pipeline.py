@@ -46,7 +46,7 @@ if test_mae < metric.get("test_mae"):
     model_registry = project.get_model_registry()
 
     model = model_registry.sklearn.create_model(
-        name="taxi_demand_predictor_next_hour",
+        name="bike_demand_predictor_next_4hour",
         metrics={"test_mae": test_mae},
         input_example=features.sample(),
         model_schema=model_schema,
