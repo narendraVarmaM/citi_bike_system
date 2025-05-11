@@ -114,7 +114,8 @@ def fetch_predictions(hours):
 
     fs = get_feature_store()
     fg = fs.get_feature_group(name=config.FEATURE_GROUP_MODEL_PREDICTION, version=1)
-
+    print(f"Current hour: {current_hour}")  
+    print(f"Fetching rides from {current_hour} to now")
     df = fg.filter((fg.pickup_hour >= current_hour)).read()
 
     return df
@@ -125,7 +126,8 @@ def fetch_hourly_rides(hours):
 
     fs = get_feature_store()
     fg = fs.get_feature_group(name=config.FEATURE_GROUP_NAME, version=1)
-
+    print(f"Current hour: {current_hour}")
+    print(f"Fetching rides from {current_hour} to now")
     query = fg.select_all()
     query = query.filter(fg.pickup_hour >= current_hour)
 
