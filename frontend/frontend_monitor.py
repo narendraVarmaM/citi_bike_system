@@ -20,7 +20,7 @@ past_hours = st.sidebar.slider(
     min_value=12,  # Minimum allowed value
     max_value=6 * 28,  # (Optional) Maximum allowed value
     value=12,  # Initial/default value
-    step=1,  # Step size for increment/decrement
+    step=4,  # Step size for increment/decrement
 )
 
 # Fetch data
